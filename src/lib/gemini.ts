@@ -2,7 +2,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Chapter } from "../types";
 
 function getAI(customKey?: string) {
-  const apiKey = customKey || process.env.GEMINI_API_KEY || "";
+  // Use custom key from UI, or environment variable from Vite
+  const apiKey = customKey || (import.meta.env.VITE_GEMINI_API_KEY as string) || "";
   return new GoogleGenAI({ apiKey });
 }
 
