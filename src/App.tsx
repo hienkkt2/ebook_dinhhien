@@ -66,9 +66,10 @@ export default function App() {
         chapters,
         coverImageKeyword: coverKeyword
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating outline:', error);
-      alert('Error generating outline. Please check your API Key.');
+      const errorMessage = error?.message || 'Error generating outline. Please check your API Key.';
+      alert(errorMessage);
     } finally {
       setIsGeneratingOutline(false);
     }
@@ -112,7 +113,7 @@ export default function App() {
         return { ...prev, chapters: newChapters };
       });
       setSelectedChapterId(chapterId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating chapter:', error);
       setEbook(prev => {
         if (!prev) return null;
@@ -120,7 +121,9 @@ export default function App() {
         newChapters[chapterIndex] = { ...newChapters[chapterIndex], isGenerating: false };
         return { ...prev, chapters: newChapters };
       });
-      alert('Error generating chapter content.');
+      
+      const errorMessage = error?.message || 'Error generating chapter content.';
+      alert(errorMessage);
     } finally {
       setIsGeneratingChapter(false);
     }

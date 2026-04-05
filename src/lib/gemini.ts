@@ -3,7 +3,12 @@ import { Chapter } from "../types";
 
 function getAI(customKey?: string) {
   // Use custom key from UI, or environment variable from Vite
-  const apiKey = customKey || (import.meta.env.VITE_GEMINI_API_KEY as string) || "";
+  const apiKey = customKey || ((import.meta as any).env.VITE_GEMINI_API_KEY as string) || "";
+  
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please configure it in Settings.");
+  }
+  
   return new GoogleGenAI({ apiKey });
 }
 
@@ -82,7 +87,7 @@ export async function generateChapterContent(
   Example: [ILLUSTRATION PROMPT: A realistic digital painting of a futuristic city with solar panels on every roof and flying electric vehicles].`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: prompt,
   });
 
