@@ -12,7 +12,7 @@ function getAI(customKey?: string) {
   return new GoogleGenAI({ apiKey });
 }
 
-export async function generateOutline(bookTitle: string, chapterCount: number = 5, customKey?: string, lang: 'en' | 'vi' = 'en'): Promise<{ chapters: Chapter[], coverKeyword: string }> {
+export async function generateOutline(bookTitle: string, chapterCount: number = 5, customKey?: string, lang: 'en' | 'vi' = 'en'): Promise<{ chapters: Chapter[], coverKeyword: string, readme: string }> {
   const ai = getAI(customKey);
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -20,7 +20,8 @@ export async function generateOutline(bookTitle: string, chapterCount: number = 
     The entire output MUST be in ${lang === 'en' ? 'English' : 'Vietnamese'}.
     Return a JSON object with:
     1. 'chapters': an array of exactly ${chapterCount} objects, each with 'title', 'description' (a brief summary), and 'imageKeyword' (a 2-3 word keyword for a stock photo related to this chapter).
-    2. 'coverKeyword': a 2-3 word keyword for a professional book cover image.`,
+    2. 'coverKeyword': a 2-3 word keyword for a professional book cover image.
+    3. 'readme': a professional "How to use this ebook" guide (about 200-300 words) explaining how to get the most out of this specific book.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -38,9 +39,10 @@ export async function generateOutline(bookTitle: string, chapterCount: number = 
               required: ["title", "description", "imageKeyword"],
             },
           },
-          coverKeyword: { type: Type.STRING }
+          coverKeyword: { type: Type.STRING },
+          readme: { type: Type.STRING }
         },
-        required: ["chapters", "coverKeyword"]
+        required: ["chapters", "coverKeyword", "readme"]
       },
     },
   });
@@ -51,7 +53,7 @@ export async function generateOutline(bookTitle: string, chapterCount: number = 
     ...item,
   }));
   
-  return { chapters, coverKeyword: data.coverKeyword || bookTitle };
+  return { chapters, coverKeyword: data.coverKeyword || bookTitle, readme: data.readme || "" };
 }
 
 export async function generateChapterContent(
@@ -92,6 +94,34 @@ export async function generateChapterContent(
   });
 
   return response.text || "Failed to generate content.";
+}
+
+export async function generateBonusContent(
+  bookTitle: string,
+  bonusTitle: string,
+  customKey?: string,
+  lang: 'en' | 'vi' = 'en'
+): Promise<string> {
+  const ai = getAI(customKey);
+
+  const prompt = `Write a high-quality bonus gift content for an ebook.
+  Book Title: ${bookTitle}
+  Bonus Gift Title: ${bonusTitle}
+  
+  The entire output MUST be in ${lang === 'en' ? 'English' : 'Vietnamese'}.
+  
+  Write in a professional, engaging style. This is a special gift for readers who purchased the ebook.
+  Use markdown formatting (headings, lists, bold text). 
+  Aim for at least 800-1200 words. Make it valuable, actionable, and well-structured.
+  
+  IMPORTANT: At 1-2 appropriate places in the text where an illustration would be helpful, insert an illustration prompt in exactly this format: [ILLUSTRATION PROMPT: Detailed description of the image to be generated here].`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+  });
+
+  return response.text || "Failed to generate bonus content.";
 }
 
 export async function translateText(

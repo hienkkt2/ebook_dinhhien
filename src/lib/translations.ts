@@ -47,7 +47,20 @@ export const translations = {
     support: "Support",
     chapter: "Chapter",
     authorLabel: "Author",
-    page: "Page"
+    page: "Page",
+    bonusGiftsLabel: "Bonus Gifts (3 titles)",
+    bonusGiftPlaceholder: "Enter bonus gift title...",
+    readmeLabel: "Readme (How to use this ebook)",
+    readmePlaceholder: "Enter instructions for your readers...",
+    generateBonus: "Generate Bonus Content",
+    downloadReadme: "Download Readme (.txt)",
+    bonusGifts: "Bonus Gifts",
+    readme: "Readme",
+    history: "History",
+    noHistory: "No saved books yet.",
+    deleteBook: "Delete Book",
+    loadBook: "Load Book",
+    lastUpdated: "Last updated"
   },
   vi: {
     title: "Tác Giả Ebook AI",
@@ -97,7 +110,20 @@ export const translations = {
     support: "Hỗ trợ",
     chapter: "Chương",
     authorLabel: "Tác giả",
-    page: "Trang"
+    page: "Trang",
+    bonusGiftsLabel: "Quà tặng Bonus (3 tiêu đề)",
+    bonusGiftPlaceholder: "Nhập tiêu đề quà tặng...",
+    readmeLabel: "Readme (Cách sử dụng ebook này)",
+    readmePlaceholder: "Nhập hướng dẫn cho độc giả của bạn...",
+    generateBonus: "Tạo Nội Dung Quà Tặng",
+    downloadReadme: "Tải Readme (.txt)",
+    bonusGifts: "Quà Tặng Bonus",
+    readme: "Hướng Dẫn (Readme)",
+    history: "Lịch Sử",
+    noHistory: "Chưa có sách nào được lưu.",
+    deleteBook: "Xóa Sách",
+    loadBook: "Mở Sách",
+    lastUpdated: "Cập nhật cuối"
   }
 };
 
