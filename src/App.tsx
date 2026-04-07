@@ -22,21 +22,33 @@ import {
   Trash2,
   Clock,
   ArrowLeft,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { jsPDF } from 'jspdf';
 import { Chapter, Ebook, BonusGift } from './types';
-import { generateOutline, generateChapterContent, generateBonusContent, translateText } from './lib/gemini';
+import { 
+  generateOutline, 
+  generateChapterContent, 
+  generateBonusContent, 
+  translateText,
+  generateSalePage,
+  generateJvPage,
+  generateOtoPage
+} from './lib/gemini';
 import { translations, Language } from './lib/translations';
 
 export default function App() {
   const [lang, setLang] = useState<Language>('en');
   const [titleInput, setTitleInput] = useState('');
+  const [upsellTitleInput, setUpsellTitleInput] = useState('');
   const [chapterCount, setChapterCount] = useState(5);
+  const [upsellChapterCount, setUpsellChapterCount] = useState(7);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [ebook, setEbook] = useState<Ebook | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  const [selectedUpsellChapterId, setSelectedUpsellChapterId] = useState<string | null>(null);
   const [isGeneratingChapter, setIsGeneratingChapter] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -48,8 +60,18 @@ export default function App() {
   const [selectedBonusId, setSelectedBonusId] = useState<string | null>(null);
   const [isGeneratingBonus, setIsGeneratingBonus] = useState(false);
   const [showReadme, setShowReadme] = useState(false);
+  const [showSalePage, setShowSalePage] = useState(false);
+  const [showJvPage, setShowJvPage] = useState(false);
+  const [showDesignAssets, setShowDesignAssets] = useState(false);
+  const [showOtoPage, setShowOtoPage] = useState(false);
+  const [showUpsellBook, setShowUpsellBook] = useState(false);
+  const [isGeneratingSalePage, setIsGeneratingSalePage] = useState(false);
+  const [isGeneratingJvPage, setIsGeneratingJvPage] = useState(false);
+  const [isGeneratingOtoPage, setIsGeneratingOtoPage] = useState(false);
+  const [isGeneratingUpsell, setIsGeneratingUpsell] = useState(false);
   const [savedBooks, setSavedBooks] = useState<Ebook[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [quotaError, setQuotaError] = useState(false);
 
   const t = translations[lang];
 
@@ -93,13 +115,25 @@ export default function App() {
     setShowSettings(false);
   };
 
+  const resetViews = () => {
+    setSelectedChapterId(null);
+    setSelectedUpsellChapterId(null);
+    setSelectedBonusId(null);
+    setShowReadme(false);
+    setShowSalePage(false);
+    setShowJvPage(false);
+    setShowOtoPage(false);
+    setShowUpsellBook(false);
+    setShowDesignAssets(false);
+  };
+
   const handleGenerateOutline = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!titleInput.trim()) return;
 
     setIsGeneratingOutline(true);
     try {
-      const { chapters, coverKeyword, readme } = await generateOutline(titleInput, chapterCount, apiKey, lang);
+      const { chapters, coverKeyword, coverPrompt, readme } = await generateOutline(titleInput, chapterCount, apiKey, lang);
       
       const bonusGifts: BonusGift[] = bonusTitles
         .filter(title => title.trim() !== '')
@@ -116,6 +150,7 @@ export default function App() {
         bonusGifts,
         readme,
         coverImageKeyword: coverKeyword,
+        coverImagePrompt: coverPrompt,
         updatedAt: Date.now()
       };
 
@@ -123,8 +158,12 @@ export default function App() {
       setReadmeInput(readme);
     } catch (error: any) {
       console.error('Error generating outline:', error);
-      const errorMessage = error?.message || 'Error generating outline. Please check your API Key.';
-      alert(errorMessage);
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        const errorMessage = error?.message || 'Error generating outline. Please check your API Key.';
+        alert(errorMessage);
+      }
     } finally {
       setIsGeneratingOutline(false);
     }
@@ -133,6 +172,9 @@ export default function App() {
   const handleGenerateChapter = async (chapterId: string) => {
     if (!ebook || isTranslating) return;
     setShowReadme(false);
+    setShowSalePage(false);
+    setShowJvPage(false);
+    setShowDesignAssets(false);
     setSelectedBonusId(null);
     
     const chapterIndex = ebook.chapters.findIndex(c => c.id === chapterId);
@@ -179,8 +221,12 @@ export default function App() {
         return { ...prev, chapters: newChapters };
       });
       
-      const errorMessage = error?.message || 'Error generating chapter content.';
-      alert(errorMessage);
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        const errorMessage = error?.message || 'Error generating chapter content.';
+        alert(errorMessage);
+      }
     } finally {
       setIsGeneratingChapter(false);
     }
@@ -191,14 +237,183 @@ export default function App() {
     downloadBlob(ebook.readme, 'text/plain', 'README.txt');
   };
 
+  const handleGenerateSalePage = async () => {
+    if (!ebook || isGeneratingSalePage) return;
+    setIsGeneratingSalePage(true);
+    try {
+      const html = await generateSalePage(ebook, apiKey, lang);
+      setEbook({ ...ebook, salePageHtml: html });
+      resetViews();
+      setShowSalePage(true);
+    } catch (error: any) {
+      console.error('Error generating sale page:', error);
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        alert(error?.message || 'Failed to generate sale page');
+      }
+    } finally {
+      setIsGeneratingSalePage(false);
+    }
+  };
+
+  const handleGenerateJvPage = async () => {
+    if (!ebook || isGeneratingJvPage) return;
+    setIsGeneratingJvPage(true);
+    try {
+      const html = await generateJvPage(ebook, apiKey, lang);
+      setEbook({ ...ebook, jvPageHtml: html });
+      resetViews();
+      setShowJvPage(true);
+    } catch (error: any) {
+      console.error('Error generating JV page:', error);
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        alert(error?.message || 'Failed to generate JV page');
+      }
+    } finally {
+      setIsGeneratingJvPage(false);
+    }
+  };
+
+  const downloadHtml = (content: string, filename: string) => {
+    downloadBlob(content, 'text/html', filename);
+  };
+
+  const handleGenerateUpsell = async () => {
+    if (!ebook || !upsellTitleInput.trim() || isGeneratingUpsell) return;
+    setIsGeneratingUpsell(true);
+    try {
+      const { chapters, coverPrompt } = await generateOutline(upsellTitleInput, upsellChapterCount, apiKey, lang);
+      setEbook({
+        ...ebook,
+        upsellBook: {
+          title: upsellTitleInput,
+          chapters,
+          coverImagePrompt: coverPrompt
+        }
+      });
+      resetViews();
+      setShowUpsellBook(true);
+    } catch (error: any) {
+      console.error('Error generating upsell:', error);
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        alert(error?.message || 'Failed to generate upsell book');
+      }
+    } finally {
+      setIsGeneratingUpsell(false);
+    }
+  };
+
+  const handleGenerateOtoPage = async () => {
+    if (!ebook || !ebook.upsellBook || isGeneratingOtoPage) return;
+    setIsGeneratingOtoPage(true);
+    try {
+      const html = await generateOtoPage(
+        ebook, 
+        ebook.upsellBook.title, 
+        ebook.upsellBook.chapters, 
+        apiKey, 
+        lang
+      );
+      setEbook({ ...ebook, otoPageHtml: html });
+      resetViews();
+      setShowOtoPage(true);
+    } catch (error: any) {
+      console.error('Error generating OTO page:', error);
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        alert(error?.message || 'Failed to generate OTO page');
+      }
+    } finally {
+      setIsGeneratingOtoPage(false);
+    }
+  };
+
+  const handleGenerateUpsellChapter = async (chapterId: string) => {
+    if (!ebook || !ebook.upsellBook || isTranslating) return;
+    
+    const chapterIndex = ebook.upsellBook.chapters.findIndex(c => c.id === chapterId);
+    const chapter = ebook.upsellBook.chapters[chapterIndex];
+    
+    if (!chapter || chapter.content || chapter.isGenerating) return;
+
+    setEbook(prev => {
+      if (!prev || !prev.upsellBook) return prev;
+      const newChapters = [...prev.upsellBook.chapters];
+      newChapters[chapterIndex] = { ...newChapters[chapterIndex], isGenerating: true };
+      return { 
+        ...prev, 
+        upsellBook: { ...prev.upsellBook, chapters: newChapters } 
+      };
+    });
+
+    try {
+      const previousChapters = ebook.upsellBook.chapters.slice(0, chapterIndex);
+      const content = await generateChapterContent(
+        ebook.upsellBook.title,
+        chapter.title,
+        chapter.description,
+        previousChapters,
+        apiKey,
+        lang
+      );
+
+      setEbook(prev => {
+        if (!prev || !prev.upsellBook) return prev;
+        const newChapters = [...prev.upsellBook.chapters];
+        newChapters[chapterIndex] = { 
+          ...newChapters[chapterIndex], 
+          content, 
+          isGenerating: false 
+        };
+        return { 
+          ...prev, 
+          upsellBook: { ...prev.upsellBook, chapters: newChapters } 
+        };
+      });
+      resetViews();
+      setSelectedUpsellChapterId(chapterId);
+    } catch (error: any) {
+      console.error('Error generating upsell chapter:', error);
+      setEbook(prev => {
+        if (!prev || !prev.upsellBook) return prev;
+        const newChapters = [...prev.upsellBook.chapters];
+        newChapters[chapterIndex] = { ...newChapters[chapterIndex], isGenerating: false };
+        return { 
+          ...prev, 
+          upsellBook: { ...prev.upsellBook, chapters: newChapters } 
+        };
+      });
+      
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        alert(error?.message || 'Error generating chapter content.');
+      }
+    }
+  };
+
   const loadBook = (book: Ebook) => {
     setEbook(book);
     setTitleInput(book.title);
+    setUpsellTitleInput(book.upsellBook?.title || '');
+    setUpsellChapterCount(book.upsellBook?.chapters.length || 7);
     setReadmeInput(book.readme);
     setShowHistory(false);
     setSelectedChapterId(null);
+    setSelectedUpsellChapterId(null);
     setSelectedBonusId(null);
     setShowReadme(false);
+    setShowSalePage(false);
+    setShowJvPage(false);
+    setShowOtoPage(false);
+    setShowUpsellBook(false);
+    setShowDesignAssets(false);
   };
 
   const deleteBook = (e: React.MouseEvent, bookId: string) => {
@@ -214,14 +429,23 @@ export default function App() {
   const startNewBook = () => {
     setEbook(null);
     setTitleInput('');
+    setUpsellTitleInput('');
+    setUpsellChapterCount(7);
     setBonusTitles(['', '', '']);
     setReadmeInput('');
     setSelectedChapterId(null);
+    setSelectedUpsellChapterId(null);
     setSelectedBonusId(null);
     setShowReadme(false);
+    setShowSalePage(false);
+    setShowJvPage(false);
+    setShowOtoPage(false);
+    setShowUpsellBook(false);
+    setShowDesignAssets(false);
   };
 
   const selectedChapter = ebook?.chapters.find(c => c.id === selectedChapterId);
+  const selectedUpsellChapter = ebook?.upsellBook?.chapters.find(c => c.id === selectedUpsellChapterId);
   const selectedBonus = ebook?.bonusGifts.find(b => b.id === selectedBonusId);
 
   const cleanMarkdown = (text: string) => {
@@ -247,6 +471,9 @@ export default function App() {
   const handleGenerateBonus = async (bonusId: string) => {
     if (!ebook || isTranslating) return;
     setShowReadme(false);
+    setShowSalePage(false);
+    setShowJvPage(false);
+    setShowDesignAssets(false);
     setSelectedChapterId(null);
 
     const bonusIndex = ebook.bonusGifts.findIndex(b => b.id === bonusId);
@@ -280,6 +507,7 @@ export default function App() {
         };
         return { ...prev, bonusGifts: newBonus };
       });
+      resetViews();
       setSelectedBonusId(bonusId);
     } catch (error: any) {
       console.error('Error generating bonus:', error);
@@ -289,7 +517,12 @@ export default function App() {
         newBonus[bonusIndex] = { ...newBonus[bonusIndex], isGenerating: false };
         return { ...prev, bonusGifts: newBonus };
       });
-      alert(error?.message || 'Error generating bonus content.');
+      
+      if (error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota')) {
+        setQuotaError(true);
+      } else {
+        alert(error?.message || 'Error generating bonus content.');
+      }
     } finally {
       setIsGeneratingBonus(false);
     }
@@ -333,12 +566,32 @@ export default function App() {
       // 4. Translate readme
       const translatedReadme = await translateText(ebook.readme, newLang, apiKey);
 
+      // 5. Translate marketing pages
+      let translatedSale = ebook.salePageHtml;
+      if (translatedSale) {
+        translatedSale = await translateText(translatedSale, newLang, apiKey);
+      }
+
+      let translatedJv = ebook.jvPageHtml;
+      if (translatedJv) {
+        translatedJv = await translateText(translatedJv, newLang, apiKey);
+      }
+
+      // 6. Translate cover prompt
+      let translatedCoverPrompt = ebook.coverImagePrompt;
+      if (translatedCoverPrompt) {
+        translatedCoverPrompt = await translateText(translatedCoverPrompt, newLang, apiKey);
+      }
+
       setEbook({
         ...ebook,
         title: translatedTitle,
         chapters: translatedChapters,
         bonusGifts: translatedBonus,
-        readme: translatedReadme
+        readme: translatedReadme,
+        salePageHtml: translatedSale,
+        jvPageHtml: translatedJv,
+        coverImagePrompt: translatedCoverPrompt
       });
       
       setTitleInput(translatedTitle);
@@ -929,6 +1182,17 @@ export default function App() {
                     disabled={isGeneratingOutline}
                   />
                 </div>
+
+                <div className="relative group">
+                  <input 
+                    type="text" 
+                    value={upsellTitleInput}
+                    onChange={(e) => setUpsellTitleInput(e.target.value)}
+                    placeholder={t.upsellPlaceholder}
+                    className="w-full pl-6 pr-12 py-5 bg-white border-2 border-slate-200 rounded-2xl text-lg focus:outline-none focus:border-indigo-500 transition-all shadow-sm group-hover:shadow-md"
+                    disabled={isGeneratingOutline}
+                  />
+                </div>
                 
                 <div className="flex items-center gap-4">
                   <div className="flex-1 flex items-center gap-3 bg-white border-2 border-slate-200 rounded-2xl px-6 py-4">
@@ -939,6 +1203,18 @@ export default function App() {
                       max="20"
                       value={chapterCount}
                       onChange={(e) => setChapterCount(parseInt(e.target.value) || 1)}
+                      className="w-full bg-transparent focus:outline-none font-bold text-indigo-600"
+                      disabled={isGeneratingOutline}
+                    />
+                  </div>
+                  <div className="flex-1 flex items-center gap-3 bg-white border-2 border-slate-200 rounded-2xl px-6 py-4">
+                    <span className="text-slate-500 font-medium whitespace-nowrap">{t.upsellChaptersLabel}:</span>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="20"
+                      value={upsellChapterCount}
+                      onChange={(e) => setUpsellChapterCount(parseInt(e.target.value) || 1)}
                       className="w-full bg-transparent focus:outline-none font-bold text-indigo-600"
                       disabled={isGeneratingOutline}
                     />
@@ -1007,7 +1283,14 @@ export default function App() {
                     {ebook.chapters.map((chapter, idx) => (
                       <button
                         key={chapter.id}
-                        onClick={() => chapter.content ? setSelectedChapterId(chapter.id) : handleGenerateChapter(chapter.id)}
+                        onClick={() => {
+                          if (chapter.content) {
+                            resetViews();
+                            setSelectedChapterId(chapter.id);
+                          } else {
+                            handleGenerateChapter(chapter.id);
+                          }
+                        }}
                         className={`w-full text-left p-4 flex items-start gap-3 transition-all hover:bg-slate-50 group ${selectedChapterId === chapter.id ? 'bg-indigo-50/50' : ''}`}
                       >
                         <div className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${chapter.content ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -1043,7 +1326,14 @@ export default function App() {
                       {ebook.bonusGifts.map((bonus, idx) => (
                         <button
                           key={bonus.id}
-                          onClick={() => bonus.content ? setSelectedBonusId(bonus.id) : handleGenerateBonus(bonus.id)}
+                          onClick={() => {
+                            if (bonus.content) {
+                              resetViews();
+                              setSelectedBonusId(bonus.id);
+                            } else {
+                              handleGenerateBonus(bonus.id);
+                            }
+                          }}
                           className={`w-full text-left p-4 flex items-start gap-3 transition-all hover:bg-slate-50 group ${selectedBonusId === bonus.id ? 'bg-indigo-50/50' : ''}`}
                         >
                           <div className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${bonus.content ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -1068,9 +1358,8 @@ export default function App() {
                 {ebook.readme && (
                   <button 
                     onClick={() => {
+                      resetViews();
                       setShowReadme(true);
-                      setSelectedChapterId(null);
-                      setSelectedBonusId(null);
                     }}
                     className={`w-full flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md ${showReadme ? 'border-indigo-600 ring-1 ring-indigo-600' : ''}`}
                   >
@@ -1083,6 +1372,142 @@ export default function App() {
                     </div>
                   </button>
                 )}
+
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      Marketing
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    <button
+                      onClick={() => {
+                        if (ebook.salePageHtml) {
+                          resetViews();
+                          setShowSalePage(true);
+                        } else {
+                          handleGenerateSalePage();
+                        }
+                      }}
+                      className={`w-full text-left p-4 flex items-start gap-3 transition-all hover:bg-slate-50 group ${showSalePage ? 'bg-indigo-50/50' : ''}`}
+                    >
+                      <div className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${ebook.salePageHtml ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {ebook.salePageHtml ? <CheckCircle2 className="w-4 h-4" /> : <FileText className="w-3 h-3" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-sm font-semibold truncate ${showSalePage ? 'text-indigo-700' : 'text-slate-800'}`}>
+                          {t.salePage}
+                        </h4>
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{t.salePageDesc}</p>
+                      </div>
+                      {isGeneratingSalePage ? (
+                        <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+                      ) : !ebook.salePageHtml && (
+                        <Plus className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (ebook.jvPageHtml) {
+                          resetViews();
+                          setShowJvPage(true);
+                        } else {
+                          handleGenerateJvPage();
+                        }
+                      }}
+                      className={`w-full text-left p-4 flex items-start gap-3 transition-all hover:bg-slate-50 group ${showJvPage ? 'bg-indigo-50/50' : ''}`}
+                    >
+                      <div className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${ebook.jvPageHtml ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {ebook.jvPageHtml ? <CheckCircle2 className="w-4 h-4" /> : <FileCode className="w-3 h-3" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-sm font-semibold truncate ${showJvPage ? 'text-indigo-700' : 'text-slate-800'}`}>
+                          {t.jvPage}
+                        </h4>
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{t.jvPageDesc}</p>
+                      </div>
+                      {isGeneratingJvPage ? (
+                        <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+                      ) : !ebook.jvPageHtml && (
+                        <Plus className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (ebook.upsellBook) {
+                          resetViews();
+                          setShowUpsellBook(true);
+                        } else {
+                          handleGenerateUpsell();
+                        }
+                      }}
+                      className={`w-full text-left p-4 flex items-start gap-3 transition-all hover:bg-slate-50 group ${showUpsellBook ? 'bg-indigo-50/50' : ''}`}
+                    >
+                      <div className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${ebook.upsellBook ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {ebook.upsellBook ? <CheckCircle2 className="w-4 h-4" /> : <Book className="w-3 h-3" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-sm font-semibold truncate ${showUpsellBook ? 'text-indigo-700' : 'text-slate-800'}`}>
+                          {t.upsellBook}
+                        </h4>
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{t.generateUpsell}</p>
+                      </div>
+                      {isGeneratingUpsell ? (
+                        <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+                      ) : !ebook.upsellBook && (
+                        <Plus className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (ebook.otoPageHtml) {
+                          resetViews();
+                          setShowOtoPage(true);
+                        } else {
+                          handleGenerateOtoPage();
+                        }
+                      }}
+                      className={`w-full text-left p-4 flex items-start gap-3 transition-all hover:bg-slate-50 group ${showOtoPage ? 'bg-indigo-50/50' : ''}`}
+                    >
+                      <div className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${ebook.otoPageHtml ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {ebook.otoPageHtml ? <CheckCircle2 className="w-4 h-4" /> : <FileCode className="w-3 h-3" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-sm font-semibold truncate ${showOtoPage ? 'text-indigo-700' : 'text-slate-800'}`}>
+                          {t.otoPage}
+                        </h4>
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{t.otoPageDesc}</p>
+                      </div>
+                      {isGeneratingOtoPage ? (
+                        <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+                      ) : !ebook.otoPageHtml && (
+                        <Plus className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        resetViews();
+                        setShowDesignAssets(true);
+                      }}
+                      className={`w-full text-left p-4 flex items-start gap-3 transition-all hover:bg-slate-50 group ${showDesignAssets ? 'bg-indigo-50/50' : ''}`}
+                    >
+                      <div className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-indigo-100 text-indigo-700`}>
+                        <Sparkles className="w-3 h-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-sm font-semibold truncate ${showDesignAssets ? 'text-indigo-700' : 'text-slate-800'}`}>
+                          {t.designAssets}
+                        </h4>
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{t.designAssetsDesc}</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Main Content Area */}
@@ -1140,6 +1565,360 @@ export default function App() {
                         <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200 font-mono text-sm whitespace-pre-wrap leading-relaxed text-slate-700">
                           {ebook.readme}
                         </div>
+                      </div>
+                    </>
+                  ) : showSalePage && ebook.salePageHtml ? (
+                    <>
+                      <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-1 block">{t.salePage}</span>
+                          <h2 className="text-3xl font-bold text-slate-900">{t.salePage}</h2>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(ebook.salePageHtml || '');
+                              alert(t.copyCode);
+                            }}
+                            className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all shadow-sm"
+                          >
+                            <FileCode className="w-4 h-4" />
+                            {t.copyCode}
+                          </button>
+                          <button 
+                            onClick={() => downloadHtml(ebook.salePageHtml || '', 'salepage.html')}
+                            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-sm"
+                          >
+                            <Download className="w-4 h-4" />
+                            {t.downloadHtml}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-10 max-w-none overflow-y-auto flex-1">
+                        <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 font-mono text-sm whitespace-pre-wrap leading-relaxed text-indigo-300 overflow-x-auto">
+                          {ebook.salePageHtml}
+                        </div>
+                      </div>
+                    </>
+                  ) : showJvPage && ebook.jvPageHtml ? (
+                    <>
+                      <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-1 block">{t.jvPage}</span>
+                          <h2 className="text-3xl font-bold text-slate-900">{t.jvPage}</h2>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(ebook.jvPageHtml || '');
+                              alert(t.copyCode);
+                            }}
+                            className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all shadow-sm"
+                          >
+                            <FileCode className="w-4 h-4" />
+                            {t.copyCode}
+                          </button>
+                          <button 
+                            onClick={() => downloadHtml(ebook.jvPageHtml || '', 'jvpage.html')}
+                            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-sm"
+                          >
+                            <Download className="w-4 h-4" />
+                            {t.downloadHtml}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-10 max-w-none overflow-y-auto flex-1">
+                        <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 font-mono text-sm whitespace-pre-wrap leading-relaxed text-indigo-300 overflow-x-auto">
+                          {ebook.jvPageHtml}
+                        </div>
+                      </div>
+                    </>
+                  ) : showOtoPage && ebook.otoPageHtml ? (
+                    <>
+                      <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-1 block">{t.otoPage}</span>
+                          <h2 className="text-3xl font-bold text-slate-900">{t.otoPage}</h2>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(ebook.otoPageHtml || '');
+                              alert(t.copyCode);
+                            }}
+                            className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all shadow-sm"
+                          >
+                            <FileCode className="w-4 h-4" />
+                            {t.copyCode}
+                          </button>
+                          <button 
+                            onClick={() => downloadHtml(ebook.otoPageHtml || '', 'otopage.html')}
+                            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-sm"
+                          >
+                            <Download className="w-4 h-4" />
+                            {t.downloadHtml}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-10 max-w-none overflow-y-auto flex-1">
+                        <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 font-mono text-sm whitespace-pre-wrap leading-relaxed text-indigo-300 overflow-x-auto">
+                          {ebook.otoPageHtml}
+                        </div>
+                      </div>
+                    </>
+                  ) : showUpsellBook && ebook.upsellBook ? (
+                    <>
+                      {selectedUpsellChapter ? (
+                        <>
+                          <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <button 
+                                onClick={() => setSelectedUpsellChapterId(null)}
+                                className="p-2 hover:bg-white rounded-xl transition-all text-slate-400 hover:text-indigo-600 border border-transparent hover:border-slate-100"
+                              >
+                                <ArrowLeft className="w-5 h-5" />
+                              </button>
+                              <div>
+                                <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-1 block">{t.upsellBook}</span>
+                                <h2 className="text-3xl font-bold text-slate-900">{selectedUpsellChapter.title}</h2>
+                              </div>
+                            </div>
+                            <Sparkles className="w-10 h-10 text-indigo-100" />
+                          </div>
+                          <div className="p-10 max-w-none overflow-y-auto flex-1">
+                            <MarkdownRenderer content={selectedUpsellChapter.content || ''} />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-1 block">{t.upsellBook}</span>
+                              <h2 className="text-3xl font-bold text-slate-900">{ebook.upsellBook.title}</h2>
+                            </div>
+                            <Sparkles className="w-10 h-10 text-indigo-100" />
+                          </div>
+                          <div className="p-10 max-w-none overflow-y-auto flex-1">
+                            <div className="space-y-6">
+                              <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+                                <h3 className="font-bold text-indigo-900 mb-4">{t.toc}</h3>
+                                <div className="space-y-3">
+                                  {ebook.upsellBook.chapters.map((chapter, idx) => (
+                                    <button 
+                                      key={chapter.id}
+                                      onClick={() => chapter.content ? setSelectedUpsellChapterId(chapter.id) : handleGenerateUpsellChapter(chapter.id)}
+                                      className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all group ${chapter.content ? 'bg-white border-indigo-100 hover:border-indigo-300 hover:shadow-sm' : 'bg-white/50 border-slate-100 hover:bg-white'}`}
+                                      disabled={chapter.isGenerating}
+                                    >
+                                      <div className="flex items-center gap-3 text-sm text-indigo-700">
+                                        <span className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center font-bold text-xs">{idx + 1}</span>
+                                        <span className="font-semibold">{chapter.title}</span>
+                                      </div>
+                                      {chapter.isGenerating ? (
+                                        <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+                                      ) : chapter.content ? (
+                                        <ChevronRight className="w-4 h-4 text-indigo-300 group-hover:text-indigo-500 transition-colors" />
+                                      ) : (
+                                        <Plus className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                                <h3 className="font-bold text-slate-900 mb-2">{t.coverPrompt}</h3>
+                                <p className="text-sm text-slate-600 italic leading-relaxed">{ebook.upsellBook.coverImagePrompt}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : showDesignAssets ? (
+                    <>
+                      <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-1 block">{t.designAssets}</span>
+                          <h2 className="text-3xl font-bold text-slate-900">{t.designAssets}</h2>
+                        </div>
+                        <Sparkles className="w-10 h-10 text-indigo-100" />
+                      </div>
+                      <div className="p-10 max-w-none overflow-y-auto flex-1 space-y-8">
+                        {/* Cover Prompt */}
+                        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                              <BookOpen className="w-5 h-5 text-indigo-600" />
+                              {t.coverPrompt}
+                            </h3>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(ebook.coverImagePrompt || '');
+                                alert(t.copyPrompt);
+                              }}
+                              className="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                            >
+                              {t.copyPrompt}
+                            </button>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-slate-100 text-sm italic text-slate-600 leading-relaxed">
+                            {ebook.coverImagePrompt || `A professional book cover for "${ebook.title}"`}
+                          </div>
+                        </div>
+
+                        {/* Upsell Cover Prompt */}
+                        {ebook.upsellBook && (
+                          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                <BookOpen className="w-5 h-5 text-indigo-600" />
+                                {t.upsellBook} - {t.coverPrompt}
+                              </h3>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(ebook.upsellBook?.coverImagePrompt || '');
+                                  alert(t.copyPrompt);
+                                }}
+                                className="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                              >
+                                {t.copyPrompt}
+                              </button>
+                            </div>
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 text-sm italic text-slate-600 leading-relaxed">
+                              {ebook.upsellBook.coverImagePrompt || `A professional book cover for "${ebook.upsellBook.title}"`}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Chapter Prompts */}
+                        <div className="space-y-4">
+                          <h3 className="font-bold text-slate-900 flex items-center gap-2 px-2">
+                            <FileText className="w-5 h-5 text-indigo-600" />
+                            {t.chapterPrompts}
+                          </h3>
+                          <div className="grid grid-cols-1 gap-4">
+                            {ebook.chapters.map((chapter, idx) => {
+                              const prompts = Array.from(chapter.content?.matchAll(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g) || []).map(m => m[1]);
+                              
+                              if (prompts.length === 0) return null;
+
+                              return (
+                                <div key={chapter.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.chapter} {idx + 1}: {chapter.title}</span>
+                                  </div>
+                                  <div className="space-y-4">
+                                    {prompts.map((prompt, pIdx) => (
+                                      <div key={pIdx} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Prompt {pIdx + 1}</span>
+                                          <button 
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(prompt);
+                                              alert(t.copyPrompt);
+                                            }}
+                                            className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md font-bold text-slate-500 hover:bg-slate-100 transition-all"
+                                          >
+                                            {t.copyPrompt}
+                                          </button>
+                                        </div>
+                                        <p className="text-sm text-slate-600 italic leading-relaxed">{prompt}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Upsell Chapter Prompts */}
+                        {ebook.upsellBook && ebook.upsellBook.chapters.some(c => c.content?.includes('[ILLUSTRATION PROMPT:')) && (
+                          <div className="space-y-4">
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2 px-2">
+                              <Book className="w-5 h-5 text-indigo-600" />
+                              {t.upsellBook} - {t.chapterPrompts}
+                            </h3>
+                            <div className="grid grid-cols-1 gap-4">
+                              {ebook.upsellBook.chapters.map((chapter, idx) => {
+                                const prompts = Array.from(chapter.content?.matchAll(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g) || []).map(m => m[1]);
+                                
+                                if (prompts.length === 0) return null;
+
+                                return (
+                                  <div key={chapter.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4">
+                                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t.chapter} {idx + 1}: {chapter.title}</span>
+                                    </div>
+                                    <div className="space-y-4">
+                                      {prompts.map((prompt, pIdx) => (
+                                        <div key={pIdx} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Prompt {pIdx + 1}</span>
+                                            <button 
+                                              onClick={() => {
+                                                navigator.clipboard.writeText(prompt);
+                                                alert(t.copyPrompt);
+                                              }}
+                                              className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md font-bold text-slate-500 hover:bg-slate-100 transition-all"
+                                            >
+                                              {t.copyPrompt}
+                                            </button>
+                                          </div>
+                                          <p className="text-sm text-slate-600 italic leading-relaxed">{prompt}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bonus Prompts */}
+                        {ebook.bonusGifts.some(b => b.content?.includes('[ILLUSTRATION PROMPT:')) && (
+                          <div className="space-y-4">
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2 px-2">
+                              <Sparkles className="w-5 h-5 text-indigo-600" />
+                              {t.bonusGifts}
+                            </h3>
+                            <div className="grid grid-cols-1 gap-4">
+                              {ebook.bonusGifts.map((bonus, idx) => {
+                                const prompts = Array.from(bonus.content?.matchAll(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g) || []).map(m => m[1]);
+                                
+                                if (prompts.length === 0) return null;
+
+                                return (
+                                  <div key={bonus.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4">
+                                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{bonus.title}</span>
+                                    </div>
+                                    <div className="space-y-4">
+                                      {prompts.map((prompt, pIdx) => (
+                                        <div key={pIdx} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Prompt {pIdx + 1}</span>
+                                            <button 
+                                              onClick={() => {
+                                                navigator.clipboard.writeText(prompt);
+                                                alert(t.copyPrompt);
+                                              }}
+                                              className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md font-bold text-slate-500 hover:bg-slate-100 transition-all"
+                                            >
+                                              {t.copyPrompt}
+                                            </button>
+                                          </div>
+                                          <p className="text-sm text-slate-600 italic leading-relaxed">{prompt}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </>
                   ) : (
@@ -1290,6 +2069,42 @@ export default function App() {
                   className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-md"
                 >
                   {t.save}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Quota Error Modal */}
+      <AnimatePresence>
+        {quotaError && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setQuotaError(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative bg-white rounded-[32px] shadow-2xl max-w-md w-full overflow-hidden border border-red-100"
+            >
+              <div className="p-8 text-center">
+                <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <AlertTriangle className="w-10 h-10 text-red-500" />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">{t.quotaExceededTitle}</h3>
+                <p className="text-slate-600 leading-relaxed mb-8">
+                  {t.quotaExceededMsg}
+                </p>
+                <button 
+                  onClick={() => setQuotaError(false)}
+                  className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98]"
+                >
+                  {t.gotIt}
                 </button>
               </div>
             </motion.div>

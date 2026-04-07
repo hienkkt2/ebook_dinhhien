@@ -21,6 +21,15 @@ export interface Ebook {
   chapters: Chapter[];
   bonusGifts: BonusGift[];
   readme: string;
+  salePageHtml?: string;
+  jvPageHtml?: string;
+  otoPageHtml?: string;
+  upsellBook?: {
+    title: string;
+    chapters: Chapter[];
+    coverImagePrompt?: string;
+  };
   coverImageKeyword?: string;
+  coverImagePrompt?: string;
   updatedAt: number;
 }
