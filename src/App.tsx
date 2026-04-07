@@ -603,108 +603,223 @@ export default function App() {
     }
   };
 
-  const exportFile = async (format: 'md' | 'txt' | 'doc' | 'pdf') => {
+  const exportFile = async (format: 'md' | 'txt' | 'doc' | 'pdf', part: 'all' | 'ebook' | 'bonus' | 'upsell' | 'salepage' | 'jvpage' | 'otopage' | 'prompts' = 'all') => {
     if (!ebook) return;
     
     if (format === 'md') {
-      let content = `# ${ebook.title}\n\n${t.authorLabel}: ${ebook.author}\n\n---\n\n`;
-      
-      content += `## ${t.toc}\n\n`;
-      ebook.chapters.forEach((c, i) => {
-        content += `${i + 1}. ${c.title}\n`;
-      });
-      if (ebook.bonusGifts.length > 0) {
-        content += `\n### ${t.bonusGifts}\n\n`;
-        ebook.bonusGifts.forEach((b, i) => {
-          content += `${i + 1}. ${b.title}\n`;
+      let content = '';
+      const suffix = part === 'all' ? '' : `_${part}`;
+
+      if (part === 'all' || part === 'ebook') {
+        content += `# ${ebook.title}\n\n${t.authorLabel}: ${ebook.author}\n\n---\n\n`;
+        content += `## ${t.toc}\n\n`;
+        ebook.chapters.forEach((c, i) => {
+          content += `${i + 1}. ${c.title}\n`;
+        });
+        content += `\n---\n\n`;
+        ebook.chapters.forEach(c => {
+          content += `## ${c.title}\n\n${c.content || `*${t.chapterNotGenerated}*`}\n\n---\n\n`;
         });
       }
-      content += `\n---\n\n`;
 
-      ebook.chapters.forEach(c => {
-        content += `## ${c.title}\n\n${c.content || `*${t.chapterNotGenerated}*`}\n\n---\n\n`;
-      });
-
-      if (ebook.bonusGifts.length > 0) {
+      if ((part === 'all' || part === 'bonus') && ebook.bonusGifts.length > 0) {
         content += `# ${t.bonusGifts}\n\n`;
         ebook.bonusGifts.forEach(b => {
           content += `## ${b.title}\n\n${b.content || `*${t.chapterNotGenerated}*`}\n\n---\n\n`;
         });
       }
 
-      if (ebook.readme) {
+      if ((part === 'all' || part === 'upsell') && ebook.upsellBook) {
+        content += `# ${ebook.upsellBook.title} (UPSELL)\n\n---\n\n`;
+        ebook.upsellBook.chapters.forEach(c => {
+          content += `## ${c.title}\n\n${c.content || `*${t.chapterNotGenerated}*`}\n\n---\n\n`;
+        });
+      }
+
+      if ((part === 'all' || part === 'salepage') && ebook.salePageHtml) {
+        content += `# ${t.salePage}\n\n\`\`\`html\n${ebook.salePageHtml}\n\`\`\`\n\n---\n\n`;
+      }
+
+      if ((part === 'all' || part === 'jvpage') && ebook.jvPageHtml) {
+        content += `# ${t.jvPage}\n\n\`\`\`html\n${ebook.jvPageHtml}\n\`\`\`\n\n---\n\n`;
+      }
+
+      if ((part === 'all' || part === 'otopage') && ebook.otoPageHtml) {
+        content += `# ${t.otoPage}\n\n\`\`\`html\n${ebook.otoPageHtml}\n\`\`\`\n\n---\n\n`;
+      }
+
+      if (part === 'prompts') {
+        content += `# ${t.designAssets}\n\n`;
+        content += `## ${t.coverPrompt}\n${ebook.coverImagePrompt || 'N/A'}\n\n`;
+        if (ebook.upsellBook) {
+          content += `## ${t.upsellBook} - ${t.coverPrompt}\n${ebook.upsellBook.coverImagePrompt || 'N/A'}\n\n`;
+        }
+        content += `## ${t.chapterPrompts}\n\n`;
+        ebook.chapters.forEach((c, i) => {
+          const prompts = Array.from(c.content?.matchAll(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g) || []).map(m => m[1]);
+          if (prompts.length > 0) {
+            content += `### ${t.chapter} ${i+1}: ${c.title}\n`;
+            prompts.forEach((p, pi) => content += `- Prompt ${pi+1}: ${p}\n`);
+            content += `\n`;
+          }
+        });
+      }
+
+      if (ebook.readme && part === 'all') {
         content += `# ${t.readme}\n\n${ebook.readme}\n`;
       }
 
-      downloadBlob(content, 'text/markdown', `${ebook.title.replace(/\s+/g, '_')}.md`);
+      downloadBlob(content, 'text/markdown', `${ebook.title.replace(/\s+/g, '_')}${suffix}.md`);
     } else if (format === 'txt') {
-      let content = `${ebook.title.toUpperCase()}\n${t.authorLabel}: ${ebook.author}\n\n`;
-      
-      content += `${t.toc.toUpperCase()}\n\n`;
-      ebook.chapters.forEach((c, i) => {
-        content += `${i + 1}. ${c.title}\n`;
-      });
-      if (ebook.bonusGifts.length > 0) {
-        content += `\n${t.bonusGifts.toUpperCase()}\n\n`;
-        ebook.bonusGifts.forEach((b, i) => {
-          content += `${i + 1}. ${b.title}\n`;
+      let content = '';
+      const suffix = part === 'all' ? '' : `_${part}`;
+
+      if (part === 'all' || part === 'ebook') {
+        content += `${ebook.title.toUpperCase()}\n${t.authorLabel}: ${ebook.author}\n\n`;
+        content += `${t.toc.toUpperCase()}\n\n`;
+        ebook.chapters.forEach((c, i) => {
+          content += `${i + 1}. ${c.title}\n`;
+        });
+        content += `\n${'='.repeat(20)}\n\n`;
+        ebook.chapters.forEach(c => {
+          content += `${c.title.toUpperCase()}\n\n${c.content || t.chapterNotGenerated}\n\n${'='.repeat(20)}\n\n`;
         });
       }
-      content += `\n${'='.repeat(20)}\n\n`;
 
-      ebook.chapters.forEach(c => {
-        content += `${c.title.toUpperCase()}\n\n${c.content || t.chapterNotGenerated}\n\n${'='.repeat(20)}\n\n`;
-      });
-
-      if (ebook.bonusGifts.length > 0) {
+      if ((part === 'all' || part === 'bonus') && ebook.bonusGifts.length > 0) {
         content += `${t.bonusGifts.toUpperCase()}\n\n`;
         ebook.bonusGifts.forEach(b => {
           content += `${b.title.toUpperCase()}\n\n${b.content || t.chapterNotGenerated}\n\n${'='.repeat(20)}\n\n`;
         });
       }
 
-      if (ebook.readme) {
+      if ((part === 'all' || part === 'upsell') && ebook.upsellBook) {
+        content += `${ebook.upsellBook.title.toUpperCase()} (UPSELL)\n\n`;
+        ebook.upsellBook.chapters.forEach(c => {
+          content += `${c.title.toUpperCase()}\n\n${c.content || t.chapterNotGenerated}\n\n${'='.repeat(20)}\n\n`;
+        });
+      }
+
+      if ((part === 'all' || part === 'salepage') && ebook.salePageHtml) {
+        content += `${t.salePage.toUpperCase()}\n\n${ebook.salePageHtml}\n\n${'='.repeat(20)}\n\n`;
+      }
+
+      if ((part === 'all' || part === 'jvpage') && ebook.jvPageHtml) {
+        content += `${t.jvPage.toUpperCase()}\n\n${ebook.jvPageHtml}\n\n${'='.repeat(20)}\n\n`;
+      }
+
+      if (part === 'prompts') {
+        content += `${t.designAssets.toUpperCase()}\n\n`;
+        content += `${t.coverPrompt}: ${ebook.coverImagePrompt || 'N/A'}\n\n`;
+        ebook.chapters.forEach((c, i) => {
+          const prompts = Array.from(c.content?.matchAll(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g) || []).map(m => m[1]);
+          if (prompts.length > 0) {
+            content += `${t.chapter.toUpperCase()} ${i+1}: ${c.title}\n`;
+            prompts.forEach((p, pi) => content += `- Prompt ${pi+1}: ${p}\n`);
+            content += `\n`;
+          }
+        });
+      }
+
+      if (ebook.readme && part === 'all') {
         content += `${t.readme.toUpperCase()}\n\n${ebook.readme}\n`;
       }
 
-      downloadBlob(content, 'text/plain', `${ebook.title.replace(/\s+/g, '_')}.txt`);
+      downloadBlob(content, 'text/plain', `${ebook.title.replace(/\s+/g, '_')}${suffix}.txt`);
     } else if (format === 'doc') {
+      const suffix = part === 'all' ? '' : `_${part}`;
       let html = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head><meta charset='utf-8'><title>${ebook.title}</title>
         <style>
-          body { font-family: 'Times New Roman', serif; line-height: 1.6; padding: 50px; }
-          h1 { text-align: center; color: #1a202c; font-size: 32pt; margin-bottom: 20pt; }
-          h2 { color: #2d3748; font-size: 24pt; margin-top: 40pt; border-bottom: 1px solid #e2e8f0; padding-bottom: 10pt; }
-          p { margin-bottom: 12pt; text-align: justify; }
-          .chapter { page-break-before: always; }
-          .toc { margin-bottom: 50px; page-break-after: always; }
-          .toc h2 { text-align: center; border: none; font-size: 28pt; }
-          .toc-item { margin-bottom: 12px; font-size: 14pt; border-bottom: 1px dotted #ccc; padding-bottom: 4px; }
-          .toc-item span { float: right; }
-          .cover { text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
-          .prompt-box { background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 20px; margin: 30px 0; text-align: center; }
+          @page { margin: 1in; }
+          body { font-family: 'Times New Roman', serif; line-height: 1.6; color: #1a202c; }
+          .cover { 
+            background-color: #1e293b; 
+            color: white; 
+            text-align: center; 
+            height: 100%; 
+            padding: 100pt 50pt;
+            page-break-after: always; 
+          }
+          .cover h1 { font-size: 48pt; margin-bottom: 40pt; text-transform: uppercase; font-weight: bold; }
+          .cover p { font-size: 22pt; font-weight: normal; }
+          
+          .toc { page-break-after: always; padding: 50pt; }
+          .toc h2 { text-align: center; font-size: 28pt; margin-bottom: 30pt; border: none; text-transform: uppercase; }
+          .toc-item { margin-bottom: 12pt; font-size: 14pt; border-bottom: 1px dotted #ccc; display: flex; justify-content: space-between; }
+          
+          .section-separator { 
+            background-color: #4f46e5; 
+            color: white; 
+            text-align: center; 
+            padding: 200pt 50pt; 
+            page-break-before: always; 
+            page-break-after: always; 
+          }
+          .section-separator h1 { font-size: 40pt; text-transform: uppercase; font-weight: bold; }
+
+          .chapter-header { 
+            background-color: #4f46e5; 
+            color: white; 
+            padding: 30pt 20pt; 
+            margin-bottom: 30pt;
+            page-break-before: always;
+          }
+          .chapter-header p { margin: 0; font-weight: bold; font-size: 14pt; text-transform: uppercase; opacity: 0.9; }
+          .chapter-header h2 { margin: 10pt 0 0 0; font-size: 28pt; border: none; color: white; text-transform: uppercase; font-weight: bold; }
+          
+          .content { padding: 0 20pt; }
+          .description { font-style: italic; color: #4a5568; margin-bottom: 30pt; font-size: 13pt; border-left: 4pt solid #e2e8f0; padding-left: 15pt; }
+          
+          h2 { color: #2d3748; font-size: 24pt; margin-top: 40pt; border-bottom: 2px solid #4f46e5; padding-bottom: 10pt; text-transform: uppercase; }
+          p { margin-bottom: 12pt; text-align: justify; font-size: 12pt; }
+          
+          .prompt-box { 
+            background-color: #f8fafc; 
+            border: 2px dashed #4f46e5; 
+            border-radius: 12px; 
+            padding: 20pt; 
+            margin: 30pt 0; 
+            text-align: center; 
+            font-style: italic;
+            font-weight: bold;
+            color: #4f46e5;
+            font-size: 11pt;
+          }
         </style>
         </head>
         <body>
           <div class='cover'>
-            <h1 style='font-size: 48pt; margin-top: 100pt;'>${ebook.title}</h1>
-            <p style='text-align: center; font-size: 22pt; margin-top: 40pt;'>${t.authorLabel}: ${ebook.author}</p>
+            <h1>${ebook.title}</h1>
+            <p>${t.authorLabel}: ${ebook.author}</p>
           </div>
           
+          ${(part === 'all' || part === 'ebook') ? `
           <div class='toc'>
-            <h2>${t.toc}</h2>
+            <h2>${t.toc.toUpperCase()}</h2>
             <div style='margin-top: 30pt;'>
               ${ebook.chapters.map((c, i) => `
                 <div class='toc-item'>
-                  ${t.chapter} ${i+1}: ${c.title}
+                  <span>${t.chapter} ${i+1}: ${c.title}</span>
+                  <span style='float: right;'>...</span>
                 </div>
               `).join('')}
-              ${ebook.bonusGifts.length > 0 ? `
-                <h3 style='margin-top: 20pt;'>${t.bonusGifts}</h3>
-                ${ebook.bonusGifts.map((b, i) => `
+              ${(part === 'all' && ebook.bonusGifts.length > 0) ? `
+                <div style='margin-top: 20pt; font-weight: bold; border-bottom: 2px solid #4f46e5; padding-bottom: 5pt;'>${t.bonusGifts.toUpperCase()}</div>
+                ${ebook.bonusGifts.map(b => `
                   <div class='toc-item'>
-                    ${b.title}
+                    <span>${b.title}</span>
+                    <span style='float: right;'>...</span>
+                  </div>
+                `).join('')}
+              ` : ''}
+              ${(part === 'all' && ebook.upsellBook) ? `
+                <div style='margin-top: 20pt; font-weight: bold; border-bottom: 2px solid #4f46e5; padding-bottom: 5pt;'>${ebook.upsellBook.title.toUpperCase()}</div>
+                ${ebook.upsellBook.chapters.map((c, i) => `
+                  <div class='toc-item'>
+                    <span>${t.chapter} ${i+1}: ${c.title}</span>
+                    <span style='float: right;'>...</span>
                   </div>
                 `).join('')}
               ` : ''}
@@ -712,42 +827,105 @@ export default function App() {
           </div>
           
           ${ebook.chapters.map((c, i) => `
-            <div class='chapter'>
-              <p style='color: #4f46e5; font-weight: bold; font-size: 14pt;'>${t.chapter.toUpperCase()} ${i+1}</p>
-              <h2 style='margin-top: 0;'>${c.title}</h2>
-              <p style='font-style: italic; color: #4a5568; margin-bottom: 30pt;'>${c.description}</p>
-              <div>${formatContentWithImages(c.content || t.chapterNotGenerated, true).replace(/\n/g, '<br>')}</div>
+            <div class='chapter-header'>
+              <p>${t.chapter} ${i+1}</p>
+              <h2>${c.title.toUpperCase()}</h2>
+            </div>
+            <div class='content'>
+              <p class='description'>${c.description}</p>
+              <div>${formatContentWithImages(c.content || t.chapterNotGenerated, true).replace(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g, "<div class='prompt-box'>[ " + t.illustrationPrompt.toUpperCase() + ": $1 ]</div>").replace(/\n/g, '<br>')}</div>
             </div>
           `).join('')}
+          ` : ''}
 
-          ${ebook.bonusGifts.length > 0 ? `
-            <div class='chapter'>
-              <h1 style='text-align: center; margin-top: 50pt;'>${t.bonusGifts}</h1>
+          ${((part === 'all' || part === 'bonus') && ebook.bonusGifts.length > 0) ? `
+            <div class='section-separator'>
+              <h1>${t.bonusGifts.toUpperCase()}</h1>
             </div>
             ${ebook.bonusGifts.map((b) => `
-              <div class='chapter'>
-                <h2>${b.title}</h2>
-                <div>${formatContentWithImages(b.content || t.chapterNotGenerated, true).replace(/\n/g, '<br>')}</div>
+              <div class='chapter-header'>
+                <p>${t.bonusGifts}</p>
+                <h2>${b.title.toUpperCase()}</h2>
+              </div>
+              <div class='content'>
+                <div>${formatContentWithImages(b.content || t.chapterNotGenerated, true).replace(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g, "<div class='prompt-box'>[ " + t.illustrationPrompt.toUpperCase() + ": $1 ]</div>").replace(/\n/g, '<br>')}</div>
               </div>
             `).join('')}
           ` : ''}
 
-          ${ebook.readme ? `
-            <div class='chapter'>
+          ${((part === 'all' || part === 'upsell') && ebook.upsellBook) ? `
+            <div class='section-separator'>
+              <h1>${ebook.upsellBook.title.toUpperCase()}</h1>
+            </div>
+            ${ebook.upsellBook.chapters.map((c, i) => `
+              <div class='chapter-header'>
+                <p>${t.upsellBook} - ${t.chapter} ${i+1}</p>
+                <h2>${c.title.toUpperCase()}</h2>
+              </div>
+              <div class='content'>
+                <div>${formatContentWithImages(c.content || t.chapterNotGenerated, true).replace(/\n/g, '<br>')}</div>
+              </div>
+            `).join('')}
+          ` : ''}
+
+          ${((part === 'all' || part === 'salepage') && ebook.salePageHtml) ? `
+            <div style='page-break-before: always; padding: 50pt;'>
+              <h2>${t.salePage}</h2>
+              <div style='background: #f1f5f9; padding: 20px; border-radius: 10px; font-family: monospace; font-size: 10pt;'>${ebook.salePageHtml.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
+            </div>
+          ` : ''}
+
+          ${((part === 'all' || part === 'jvpage') && ebook.jvPageHtml) ? `
+            <div style='page-break-before: always; padding: 50pt;'>
+              <h2>${t.jvPage}</h2>
+              <div style='background: #f1f5f9; padding: 20px; border-radius: 10px; font-family: monospace; font-size: 10pt;'>${ebook.jvPageHtml.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
+            </div>
+          ` : ''}
+
+          ${((part === 'all' || part === 'otopage') && ebook.otoPageHtml) ? `
+            <div style='page-break-before: always; padding: 50pt;'>
+              <h2>${t.otoPage}</h2>
+              <div style='background: #f1f5f9; padding: 20px; border-radius: 10px; font-family: monospace; font-size: 10pt;'>${ebook.otoPageHtml.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
+            </div>
+          ` : ''}
+
+          ${(part === 'prompts') ? `
+            <div style='page-break-before: always; padding: 50pt;'>
+              <h2>${t.designAssets}</h2>
+              <h3 style='color: #4f46e5;'>${t.coverPrompt}</h3>
+              <p style='background: #f8fafc; padding: 10pt; border-left: 4pt solid #4f46e5;'>${ebook.coverImagePrompt || 'N/A'}</p>
+              ${ebook.chapters.map((c, i) => {
+                const prompts = Array.from(c.content?.matchAll(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g) || []).map(m => m[1]);
+                if (prompts.length === 0) return '';
+                return `
+                  <h4 style='margin-top: 20pt;'>${t.chapter} ${i+1}: ${c.title}</h4>
+                  <ul style='list-style-type: square;'>${prompts.map(p => `<li style='margin-bottom: 5pt;'>${p}</li>`).join('')}</ul>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+
+          ${(ebook.readme && part === 'all') ? `
+            <div style='page-break-before: always; padding: 50pt;'>
               <h2>${t.readme}</h2>
-              <div style='white-space: pre-wrap;'>${ebook.readme}</div>
+              <div style='white-space: pre-wrap; font-family: monospace; font-size: 10pt;'>${ebook.readme}</div>
             </div>
           ` : ''}
         </body>
         </html>
       `;
-      downloadBlob(html, 'application/msword', `${ebook.title.replace(/\s+/g, '_')}.doc`);
+      downloadBlob(html, 'application/msword', `${ebook.title.replace(/\s+/g, '_')}${suffix}.doc`);
     } else if (format === 'pdf') {
       const doc = new jsPDF();
       const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
+      const suffix = part === 'all' ? '' : `_${part}`;
       
+      const chapterPages: number[] = [];
+      const bonusPages: number[] = [];
+      const upsellPages: number[] = [];
+
       const addPageNumber = () => {
         const totalPages = doc.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
@@ -758,6 +936,24 @@ export default function App() {
         }
       };
 
+      const renderText = (text: string, yStart: number, fontSize: number = 12, fontStyle: string = "normal", color: [number, number, number] = [0, 0, 0]) => {
+        doc.setFontSize(fontSize);
+        doc.setFont("times", fontStyle);
+        doc.setTextColor(color[0], color[1], color[2]);
+        const lines = doc.splitTextToSize(text, pageWidth - 40);
+        let y = yStart;
+        lines.forEach((line: string) => {
+          if (y > pageHeight - 25) {
+            doc.addPage();
+            y = 25;
+          }
+          doc.text(line, margin, y);
+          y += fontSize * 0.6;
+        });
+        return y;
+      };
+
+      // Cover Page
       doc.setFillColor(30, 41, 59);
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
       doc.setTextColor(255, 255, 255);
@@ -767,98 +963,38 @@ export default function App() {
       doc.setFontSize(18);
       doc.text(`${t.authorLabel}: ${ebook.author}`, pageWidth / 2, pageHeight / 2 + 40, { align: 'center' });
       
-      doc.addPage();
-      const tocPageNumber = doc.getNumberOfPages();
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(24);
-      doc.text(t.toc.toUpperCase(), pageWidth / 2, 30, { align: 'center' });
-      doc.setFontSize(14);
-      
-      const chapterPages: number[] = [];
-
-      for (let i = 0; i < ebook.chapters.length; i++) {
-        const c = ebook.chapters[i];
+      let tocPageNumber = 0;
+      if (part === 'all' || part === 'ebook') {
         doc.addPage();
-        chapterPages.push(doc.getNumberOfPages());
-        
-        doc.setFillColor(79, 70, 229);
-        doc.rect(0, 0, pageWidth, 60, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(20);
-        doc.text(`${t.chapter.toUpperCase()} ${i + 1}`, margin, 30);
-        doc.setFontSize(24);
-        doc.text(c.title.toUpperCase(), margin, 45);
-        
+        tocPageNumber = doc.getNumberOfPages();
         doc.setTextColor(0, 0, 0);
-        let y = 80;
-        doc.setFontSize(12);
-        doc.setFont("times", "italic");
-        const descLines = doc.splitTextToSize(c.description, pageWidth - 40);
-        doc.text(descLines, margin, y);
-        y += (descLines.length * 7) + 10;
+        doc.setFontSize(24);
+        doc.text(t.toc.toUpperCase(), pageWidth / 2, 30, { align: 'center' });
         
-        doc.setFont("times", "normal");
-        const contentWithPrompts = (c.content || t.chapterNotGenerated)
-          .replace(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g, (match, p) => `\n\n[ ${t.illustrationPrompt.toUpperCase()}: ${p} ]\n\n`);
-          
-        const contentLines = doc.splitTextToSize(cleanMarkdown(contentWithPrompts), pageWidth - 40);
-        contentLines.forEach((line: string) => {
-          if (y > pageHeight - 25) {
-            doc.addPage();
-            y = 25;
-          }
-          if (line.includes(`[ ${t.illustrationPrompt.toUpperCase()}:`)) {
-            doc.setFont("times", "bolditalic");
-            doc.setTextColor(79, 70, 229);
-          } else {
-            doc.setFont("times", "normal");
-            doc.setTextColor(0, 0, 0);
-          }
-          doc.text(line, margin, y);
-          y += 7;
-        });
-      }
-
-      const bonusPages: number[] = [];
-      if (ebook.bonusGifts.length > 0) {
-        doc.addPage();
-        doc.setFillColor(79, 70, 229);
-        doc.rect(0, 0, pageWidth, pageHeight, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(40);
-        doc.text(t.bonusGifts.toUpperCase(), pageWidth / 2, pageHeight / 2, { align: 'center' });
-
-        for (let i = 0; i < ebook.bonusGifts.length; i++) {
-          const b = ebook.bonusGifts[i];
+        for (let i = 0; i < ebook.chapters.length; i++) {
+          const c = ebook.chapters[i];
           doc.addPage();
-          bonusPages.push(doc.getNumberOfPages());
-          
+          chapterPages.push(doc.getNumberOfPages());
           doc.setFillColor(79, 70, 229);
           doc.rect(0, 0, pageWidth, 60, 'F');
           doc.setTextColor(255, 255, 255);
           doc.setFontSize(20);
-          doc.text(t.bonusGifts.toUpperCase(), margin, 30);
+          doc.text(`${t.chapter.toUpperCase()} ${i + 1}`, margin, 30);
           doc.setFontSize(24);
-          doc.text(b.title.toUpperCase(), margin, 45);
-          
+          doc.text(c.title.toUpperCase(), margin, 45);
           doc.setTextColor(0, 0, 0);
           let y = 80;
-          doc.setFont("times", "normal");
-          const contentWithPrompts = (b.content || t.chapterNotGenerated)
+          y = renderText(c.description, y, 12, "italic", [74, 85, 104]);
+          y += 10;
+          const contentWithPrompts = (c.content || t.chapterNotGenerated)
             .replace(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g, (match, p) => `\n\n[ ${t.illustrationPrompt.toUpperCase()}: ${p} ]\n\n`);
-            
           const contentLines = doc.splitTextToSize(cleanMarkdown(contentWithPrompts), pageWidth - 40);
           contentLines.forEach((line: string) => {
-            if (y > pageHeight - 25) {
-              doc.addPage();
-              y = 25;
-            }
+            if (y > pageHeight - 25) { doc.addPage(); y = 25; }
             if (line.includes(`[ ${t.illustrationPrompt.toUpperCase()}:`)) {
-              doc.setFont("times", "bolditalic");
-              doc.setTextColor(79, 70, 229);
+              doc.setFont("times", "bolditalic"); doc.setTextColor(79, 70, 229);
             } else {
-              doc.setFont("times", "normal");
-              doc.setTextColor(0, 0, 0);
+              doc.setFont("times", "normal"); doc.setTextColor(0, 0, 0);
             }
             doc.text(line, margin, y);
             y += 7;
@@ -866,70 +1002,171 @@ export default function App() {
         }
       }
 
-      let readmePage: number | null = null;
-      if (ebook.readme) {
+      if ((part === 'all' || part === 'bonus') && ebook.bonusGifts.length > 0) {
+        // ... (rest of the bonus logic)
         doc.addPage();
-        readmePage = doc.getNumberOfPages();
         doc.setFillColor(79, 70, 229);
-        doc.rect(0, 0, pageWidth, 60, 'F');
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
         doc.setTextColor(255, 255, 255);
+        doc.setFontSize(40);
+        doc.text(t.bonusGifts.toUpperCase(), pageWidth / 2, pageHeight / 2, { align: 'center' });
+        
+        for (let i = 0; i < ebook.bonusGifts.length; i++) {
+          const b = ebook.bonusGifts[i];
+          doc.addPage();
+          bonusPages.push(doc.getNumberOfPages());
+          doc.setFillColor(79, 70, 229);
+          doc.rect(0, 0, pageWidth, 60, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(20);
+          doc.text(t.bonusGifts.toUpperCase(), margin, 30);
+          doc.setFontSize(24);
+          doc.text(b.title.toUpperCase(), margin, 45);
+          doc.setTextColor(0, 0, 0);
+          let y = 80;
+          const contentWithPrompts = (b.content || t.chapterNotGenerated)
+            .replace(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g, (match, p) => `\n\n[ ${t.illustrationPrompt.toUpperCase()}: ${p} ]\n\n`);
+          const contentLines = doc.splitTextToSize(cleanMarkdown(contentWithPrompts), pageWidth - 40);
+          contentLines.forEach((line: string) => {
+            if (y > pageHeight - 25) { doc.addPage(); y = 25; }
+            if (line.includes(`[ ${t.illustrationPrompt.toUpperCase()}:`)) {
+              doc.setFont("times", "bolditalic"); doc.setTextColor(79, 70, 229);
+            } else {
+              doc.setFont("times", "normal"); doc.setTextColor(0, 0, 0);
+            }
+            doc.text(line, margin, y);
+            y += 7;
+          });
+        }
+      }
+
+      if ((part === 'all' || part === 'upsell') && ebook.upsellBook) {
+        doc.addPage();
+        doc.setFillColor(79, 70, 229);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(40);
+        doc.text(ebook.upsellBook.title.toUpperCase(), pageWidth / 2, pageHeight / 2, { align: 'center' });
+        
+        for (let i = 0; i < ebook.upsellBook.chapters.length; i++) {
+          const c = ebook.upsellBook.chapters[i];
+          doc.addPage();
+          upsellPages.push(doc.getNumberOfPages());
+          doc.setFillColor(79, 70, 229);
+          doc.rect(0, 0, pageWidth, 60, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(20);
+          doc.text(t.upsellBook.toUpperCase(), margin, 30);
+          doc.setFontSize(24);
+          doc.text(c.title.toUpperCase(), margin, 45);
+          doc.setTextColor(0, 0, 0);
+          let y = 80;
+          const contentLines = doc.splitTextToSize(cleanMarkdown(c.content || t.chapterNotGenerated), pageWidth - 40);
+          contentLines.forEach((line: string) => {
+            if (y > pageHeight - 25) { doc.addPage(); y = 25; }
+            doc.text(line, margin, y);
+            y += 7;
+          });
+        }
+      }
+
+      // Final TOC Fill
+      if (tocPageNumber > 0) {
+        doc.setPage(tocPageNumber);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(12);
+        let tocY = 50;
+        
+        if (chapterPages.length > 0) {
+          ebook.chapters.forEach((c, i) => {
+            if (tocY > pageHeight - 20) { doc.addPage(); tocY = 20; }
+            doc.text(`${t.chapter} ${i + 1}: ${c.title}`, margin, tocY);
+            doc.text(`${chapterPages[i]}`, pageWidth - margin, tocY, { align: 'right' });
+            tocY += 10;
+          });
+        }
+
+        if (bonusPages.length > 0) {
+          if (tocY > pageHeight - 30) { doc.addPage(); tocY = 20; }
+          tocY += 5;
+          doc.setFont("times", "bold");
+          doc.text(t.bonusGifts.toUpperCase(), margin, tocY);
+          tocY += 10;
+          doc.setFont("times", "normal");
+          ebook.bonusGifts.forEach((b, i) => {
+            if (tocY > pageHeight - 20) { doc.addPage(); tocY = 20; }
+            doc.text(b.title, margin, tocY);
+            doc.text(`${bonusPages[i]}`, pageWidth - margin, tocY, { align: 'right' });
+            tocY += 10;
+          });
+        }
+
+        if (upsellPages.length > 0 && ebook.upsellBook) {
+          if (tocY > pageHeight - 30) { doc.addPage(); tocY = 20; }
+          tocY += 5;
+          doc.setFont("times", "bold");
+          doc.text(ebook.upsellBook.title.toUpperCase(), margin, tocY);
+          tocY += 10;
+          doc.setFont("times", "normal");
+          ebook.upsellBook.chapters.forEach((c, i) => {
+            if (tocY > pageHeight - 20) { doc.addPage(); tocY = 20; }
+            doc.text(`${t.chapter} ${i + 1}: ${c.title}`, margin, tocY);
+            doc.text(`${upsellPages[i]}`, pageWidth - margin, tocY, { align: 'right' });
+            tocY += 10;
+          });
+        }
+        doc.setPage(doc.getNumberOfPages());
+      }
+
+      if ((part === 'all' || part === 'salepage') && ebook.salePageHtml) {
+        doc.addPage();
+        doc.setFontSize(24);
+        doc.text(t.salePage.toUpperCase(), margin, 30);
+        renderText(ebook.salePageHtml, 50, 10, "normal", [100, 100, 100]);
+      }
+
+      if ((part === 'all' || part === 'jvpage') && ebook.jvPageHtml) {
+        doc.addPage();
+        doc.setFontSize(24);
+        doc.text(t.jvPage.toUpperCase(), margin, 30);
+        renderText(ebook.jvPageHtml, 50, 10, "normal", [100, 100, 100]);
+      }
+
+      if ((part === 'all' || part === 'otopage') && ebook.otoPageHtml) {
+        doc.addPage();
+        doc.setFontSize(24);
+        doc.text(t.otoPage.toUpperCase(), margin, 30);
+        renderText(ebook.otoPageHtml, 50, 10, "normal", [100, 100, 100]);
+      }
+
+      if (part === 'prompts') {
+        doc.addPage();
+        doc.setFontSize(24);
+        doc.text(t.designAssets.toUpperCase(), margin, 30);
+        let y = 50;
+        y = renderText(`${t.coverPrompt}: ${ebook.coverImagePrompt || 'N/A'}`, y, 12, "bold");
+        y += 10;
+        ebook.chapters.forEach((c, i) => {
+          const prompts = Array.from(c.content?.matchAll(/\[ILLUSTRATION PROMPT:\s*(.*?)\]/g) || []).map(m => m[1]);
+          if (prompts.length > 0) {
+            y = renderText(`${t.chapter} ${i+1}: ${c.title}`, y, 12, "bold");
+            prompts.forEach((p, pi) => {
+              y = renderText(`- Prompt ${pi+1}: ${p}`, y, 10);
+            });
+            y += 5;
+          }
+        });
+      }
+
+      if (ebook.readme && part === 'all') {
+        doc.addPage();
         doc.setFontSize(24);
         doc.text(t.readme.toUpperCase(), margin, 35);
-        
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("courier", "normal");
-        doc.setFontSize(10);
-        const readmeLines = doc.splitTextToSize(ebook.readme, pageWidth - 40);
-        let y = 80;
-        readmeLines.forEach((line: string) => {
-          if (y > pageHeight - 25) {
-            doc.addPage();
-            y = 25;
-          }
-          doc.text(line, margin, y);
-          y += 5;
-        });
-      }
-
-      // Go back to TOC page to add items with page numbers
-      doc.setPage(tocPageNumber);
-      let tocY = 50;
-      ebook.chapters.forEach((c, i) => {
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`${t.chapter} ${i + 1}: ${c.title}`, margin, tocY);
-        doc.text(`${chapterPages[i]}`, pageWidth - margin, tocY, { align: 'right' });
-        doc.setDrawColor(200);
-        doc.line(margin + doc.getTextWidth(`${t.chapter} ${i + 1}: ${c.title}`) + 2, tocY, pageWidth - margin - 10, tocY);
-        tocY += 12;
-      });
-
-      if (ebook.bonusGifts.length > 0) {
-        tocY += 5;
-        doc.setFontSize(14);
-        doc.setFont("times", "bold");
-        doc.text(t.bonusGifts, margin, tocY);
-        tocY += 10;
-        doc.setFont("times", "normal");
-        ebook.bonusGifts.forEach((b, i) => {
-          doc.setFontSize(12);
-          doc.text(b.title, margin, tocY);
-          doc.text(`${bonusPages[i]}`, pageWidth - margin, tocY, { align: 'right' });
-          doc.line(margin + doc.getTextWidth(b.title) + 2, tocY, pageWidth - margin - 10, tocY);
-          tocY += 10;
-        });
-      }
-
-      if (readmePage) {
-        tocY += 5;
-        doc.setFontSize(12);
-        doc.text(t.readme, margin, tocY);
-        doc.text(`${readmePage}`, pageWidth - margin, tocY, { align: 'right' });
-        doc.line(margin + doc.getTextWidth(t.readme) + 2, tocY, pageWidth - margin - 10, tocY);
+        renderText(ebook.readme, 60, 10, "normal", [50, 50, 50]);
       }
 
       addPageNumber();
-      doc.save(`${ebook.title.replace(/\s+/g, '_')}.pdf`);
+      doc.save(`${ebook.title.replace(/\s+/g, '_')}${suffix}.pdf`);
     }
     
     setShowExportMenu(false);
@@ -1070,11 +1307,60 @@ export default function App() {
                           {t.exportDoc}
                         </button>
                         <button 
-                          onClick={() => exportFile('pdf')}
+                          onClick={() => exportFile('pdf', 'all')}
                           className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
                         >
                           <File className="w-4 h-4 text-red-600" />
-                          {t.exportPdf}
+                          {t.exportFullPdf}
+                        </button>
+                        <button 
+                          onClick={() => exportFile('pdf', 'ebook')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                          <Book className="w-4 h-4 text-indigo-600" />
+                          {t.exportEbookPdf}
+                        </button>
+                        <button 
+                          onClick={() => exportFile('pdf', 'bonus')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-500" />
+                          {t.exportBonusPdf}
+                        </button>
+                        <button 
+                          onClick={() => exportFile('pdf', 'upsell')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                          <BookOpen className="w-4 h-4 text-purple-600" />
+                          {t.exportUpsellPdf}
+                        </button>
+                        <button 
+                          onClick={() => exportFile('pdf', 'salepage')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          {t.exportSalePdf}
+                        </button>
+                        <button 
+                          onClick={() => exportFile('pdf', 'jvpage')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                          <FileCode className="w-4 h-4 text-emerald-600" />
+                          {t.exportJvPdf}
+                        </button>
+                        <button 
+                          onClick={() => exportFile('pdf', 'otopage')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                          <FileText className="w-4 h-4 text-orange-600" />
+                          {t.exportOtoPdf}
+                        </button>
+                        <button 
+                          onClick={() => exportFile('pdf', 'prompts')}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                          <Sparkles className="w-4 h-4 text-pink-500" />
+                          {t.exportPromptsPdf}
                         </button>
                         <button 
                           onClick={() => exportFile('txt')}
